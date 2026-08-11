@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-main: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --border-color: #E2E8F0;
+  --border-input: #CBD5E1;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+}
+
+html.dark {
+  --bg-main: #0A0A0B;
+  --bg-card: #121214;
+  --border-color: #222225;
+  --border-input: #28282B;
+  --text-main: #FFFFFF;
+  --text-muted: #8E8E93;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.015em;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Responsive Hairline Grid Background Pattern matching Aperture OS */
+.bg-grid-pattern {
+  background-color: #F1F5F9;
+  background-image: 
+    linear-gradient(to right, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+html.dark .bg-grid-pattern {
+  background-color: #0B0B0C;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+}
+
+/* Clean Aperture Card Surface */
+.aperture-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0.875rem;
+  transition: all 0.15s ease;
+}
+
+.aperture-card:hover {
+  border-color: #94A3B8;
+}
+html.dark .aperture-card:hover {
+  border-color: #333338;
+}
+
+/* Clean Aperture Form Input */
+.aperture-input {
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-input);
+  border-radius: 0.75rem;
+  color: var(--text-main);
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease;
+}
+
+.aperture-input:focus {
+  outline: none;
+  border-color: #64748B;
+}
+html.dark .aperture-input:focus {
+  border-color: #55555C;
+}
+
+/* Clean Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #94A3B8;
+  border-radius: 9999px;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #27272A;
+}

@@ -1,0 +1,357 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Firm {
+  id               String   @id @default(uuid())
+  name             String
+  regNumber        String?
+  address          String?
+  logoUrl          String?
+  gstNo            String?
+  panNo            String?
+  email            String?
+  phone            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users            User[]
+  cases            Case[]
+}
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  password         String
+  fullName         String
+  role             String   @default("ASSOCIATE") // PARTNER, ASSOCIATE, PARALEGAL, ADMIN, ACCOUNTANT, CLIENT
+  phone            String?
+  barCouncilNo     String?
+  hourlyRate       Float    @default(3500.0)
+  isActive         Boolean  @default(true)
+  mfaEnabled       Boolean  @default(false)
+  firmId           String
+  firm             Firm     @relation(fields: [firmId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  refreshTokens    RefreshToken[]
+  casesLed         Case[]           @relation("LeadLawyer")
+  tasksAssigned    Task[]           @relation("AssignedUser")
+  timesheets       Timesheet[]
+  documents        Document[]       @relation("DocumentUploader")
+  auditLogs        AuditLog[]
+  clients          Client[]         @relation("ClientPortalUser")
+  leadsAssigned    Lead[]           @relation("AssignedLeadLawyer")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id           String   @id @default(uuid())
+  clientType   String   @default("INDIVIDUAL") // INDIVIDUAL, CORPORATE
+  name         String
+  companyName  String?
+  email        String
+  phone        String
+  pan          String?
+  gstNo        String?
+  cin          String?
+  address      String?
+  kycStatus    String   @default("VERIFIED") // PENDING, VERIFIED, REJECTED
+  kycDetails   String?  // JSON string of identity docs
+  notes        String?
+  portalAccess Boolean  @default(true)
+  userId       String?  @unique // Link to portal login if client role user
+  user         User?    @relation("ClientPortalUser", fields: [userId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  cases          Case[]
+  invoices       Invoice[]
+  contacts       Contact[]
+  communications Communication[]
+  retainers      Retainer[]
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name      String
+  role      String?  // Director, Legal Head, Manager
+  email     String
+  phone     String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Case {
+  id              String   @id @default(uuid())
+  caseNumber      String
+  cnrNumber       String?  // 16-character e-Courts unique ID
+  title           String
+  caseType        String   // CIVIL, CRIMINAL, CORPORATE, IPR, FAMILY, TAX, ARBITRATION
+  status          String   @default("UNDER_TRIAL") // FILED, UNDER_TRIAL, ADJOURNED, DISPOSED, APPEAL
+  courtName       String
+  judgeName       String?
+  opposingParty   String?
+  opposingCounsel String?
+  description     String?
+  filingDate      DateTime?
+  isConflicted    Boolean  @default(false) // Conflict check flag / restricted matter
+  
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id])
+  
+  leadLawyerId    String
+  leadLawyer      User     @relation("LeadLawyer", fields: [leadLawyerId], references: [id])
+  
+  firmId          String
+  firm            Firm     @relation(fields: [firmId], references: [id])
+
+  parentCaseId    String?
+  parentCase      Case?    @relation("RelatedCases", fields: [parentCaseId], references: [id])
+  childCases      Case[]   @relation("RelatedCases")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  hearings         Hearing[]
+  documents        Document[]
+  tasks            Task[]
+  timesheets       Timesheet[]
+  invoices         Invoice[]
+  limitationAlerts LimitationAlert[]
+  communications   Communication[]
+  expenses         Expense[]
+  retainers        Retainer[]
+  judgments        Judgment[]
+}
+
+model Hearing {
+  id           String   @id @default(uuid())
+  caseId       String
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  hearingDate  DateTime
+  purpose      String?
+  summary      String?
+  judgeNotes   String?
+  nextSteps    String?
+  status       String   @default("SCHEDULED") // SCHEDULED, COMPLETED, ADJOURNED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Document {
+  id              String   @id @default(uuid())
+  caseId          String
+  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title           String
+  docType         String   @default("PETITION") // NOTICE, AFFIDAVIT, PETITION, EVIDENCE, AGREEMENT, OTHER
+  fileUrl         String
+  fileKey         String?
+  version         Int      @default(1)
+  isClientVisible Boolean  @default(true)
+  accessLevel     String   @default("ALL") // ALL, PARTNER_ONLY
+  uploadedById    String
+  uploadedBy      User     @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Task {
+  id             String   @id @default(uuid())
+  caseId         String?
+  case           Case?    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  assignedToId   String
+  assignedTo     User     @relation("AssignedUser", fields: [assignedToId], references: [id])
+  dueDate        DateTime
+  status         String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, OVERDUE
+  priority       String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  approvalStatus String   @default("APPROVED") // PENDING_APPROVAL, APPROVED, REJECTED
+  isRecurring    Boolean  @default(false)
+  recurPattern   String?  // WEEKLY, MONTHLY
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Timesheet {
+  id          String   @id @default(uuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  description String
+  hours       Float
+  ratePerHour Float    @default(3500.0)
+  isBillable  Boolean  @default(true)
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  invoiceNumber String   @unique
+  caseId        String
+  case          Case     @relation(fields: [caseId], references: [id])
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id])
+  issueDate     DateTime @default(now())
+  dueDate       DateTime
+  status        String   @default("ISSUED") // DRAFT, ISSUED, PAID, PARTIAL, OVERDUE
+  subtotal      Float
+  cgst          Float    @default(0) // 9%
+  sgst          Float    @default(0) // 9%
+  igst          Float    @default(0) // 18%
+  totalAmount   Float
+  tdsAmount     Float    @default(0) // 10% under Sec 194J
+  netPayable    Float
+  sacCode       String   @default("998211")
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items         InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  sacCode     String   @default("998211")
+  quantity    Float    @default(1)
+  rate        Float
+  amount      Float
+}
+
+model LimitationAlert {
+  id            String   @id @default(uuid())
+  caseId        String
+  case          Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actName       String   // Limitation Act 1963, CPC, NI Act
+  section       String?
+  triggerEvent  String   // Cause of action date, Lower court decree
+  triggerDate   DateTime
+  statutoryDays Int      // e.g. 90 days for appeal to HC, 30 days for Sec 138 NI Act
+  deadlineDate  DateTime
+  alertStatus   String   @default("NORMAL") // NORMAL, WARNING, CRITICAL, EXPIRED
+  notes         String?
+  createdAt     DateTime @default(now())
+}
+
+model Lead {
+  id               String    @id @default(uuid())
+  name             String
+  companyName      String?
+  phone            String
+  email            String
+  practiceArea     String    // Corporate, Litigation, Tax, IPR, Criminal
+  source           String    @default("WEBSITE") // WEBSITE, WHATSAPP, EMAIL, REFERRAL, DIRECT
+  stage            String    @default("NEW") // NEW, CONTACTED, CONVERTED, DROPPED
+  estimatedValue   Float?
+  assignedToId     String?
+  assignedTo       User?     @relation("AssignedLeadLawyer", fields: [assignedToId], references: [id])
+  consultationDate DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  communications   Communication[]
+}
+
+model Communication {
+  id        String   @id @default(uuid())
+  caseId    String?
+  case      Case?    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  channel   String   // EMAIL, WHATSAPP, SMS, PHONE_CALL
+  direction String   @default("OUTBOUND") // INBOUND, OUTBOUND
+  subject   String?
+  body      String
+  sender    String?
+  recipient String?
+  loggedBy  String?
+  createdAt DateTime @default(now())
+}
+
+model Judgment {
+  id           String    @id @default(uuid())
+  caseId       String?
+  case         Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  title        String
+  court        String
+  citation     String?
+  judgmentDate DateTime?
+  summary      String
+  linkUrl      String?
+  tags         String?
+  createdAt    DateTime  @default(now())
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  category    String   // COURT_FEE, TRAVEL, STAMP_DUTY, EXPERT_WITNESS, OTHER
+  description String
+  amount      Float
+  receiptUrl  String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model Retainer {
+  id            String   @id @default(uuid())
+  caseId        String
+  case          Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  initialAmount Float
+  balance       Float
+  notes         String?
+  createdAt     DateTime @default(now())
+}
+
+model ReferralSource {
+  id               String   @id @default(uuid())
+  name             String
+  type             String   @default("PARTNER_FIRM") // PARTNER_FIRM, INDIVIDUAL, CAMPAIGN
+  email            String?
+  phone            String?
+  totalLeads       Int      @default(0)
+  revenueGenerated Float    @default(0.0)
+  createdAt        DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // LOGIN, READ_CASE, CREATE_DOCUMENT, EXPORT_DATA, UPDATE_ROLE, CONVERT_LEAD, SIGN_DOCUMENT
+  entity    String   // Case, Client, Invoice, User, Lead, Document
+  entityId  String?
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
