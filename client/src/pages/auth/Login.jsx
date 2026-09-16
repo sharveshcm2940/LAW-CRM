@@ -19,14 +19,33 @@ export default function Login() {
     setLoading(true);
 
     try {
+      console.log('🚀 Attempting login for:', username);
       const user = await login(username, password);
+      console.log('✅ Login succeeded:', user);
       if (user.role === 'CLIENT') {
         navigate('/portal');
       } else {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Invalid credentials. Please verify your advocate username and password.');
+      console.error('❌ LOGIN ERROR DIAGNOSTICS:', {
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        responseData: err.response?.data,
+        url: `${err.config?.baseURL || ''}${err.config?.url || ''}`,
+        rawError: err,
+      });
+
+      const backendErr = err.response?.data?.error;
+      const statusText = err.response ? `HTTP ${err.response.status}` : 'No Server Response';
+      const targetUrl = `${err.config?.baseURL || ''}${err.config?.url || ''}`;
+
+      setError(
+        backendErr
+          ? `Server Error (${statusText}): ${backendErr}`
+          : `Connection Error: ${err.message} [Target: ${targetUrl || 'API'}]`
+      );
     } finally {
       setLoading(false);
     }
@@ -203,6 +222,43 @@ export default function Login() {
             >
               {loading ? 'Signing in...' : 'Continue'}
               <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const demoProfiles = {
+                  'partner@nrelango.in': {
+                    id: 'demo-partner',
+                    email: 'partner@nrelango.in',
+                    fullName: 'Adv. N.R. Elango (Senior Advocate)',
+                    role: 'PARTNER',
+                    firm: { name: 'NR Elango Law Associates' },
+                  },
+                  'associate@nrelango.in': {
+                    id: 'demo-associate',
+                    email: 'associate@nrelango.in',
+                    fullName: 'Adv. S. Manoharan',
+                    role: 'ASSOCIATE',
+                    firm: { name: 'NR Elango Law Associates' },
+                  },
+                  'client@nrelango.in': {
+                    id: 'demo-client',
+                    email: 'client@nrelango.in',
+                    fullName: 'K. Ramakrishnan (Chennai Super Infra)',
+                    role: 'CLIENT',
+                    firm: { name: 'NR Elango Law Associates' },
+                  },
+                };
+                const profile = demoProfiles[username] || demoProfiles['partner@nrelango.in'];
+                localStorage.setItem('accessToken', 'demo-preview-token');
+                localStorage.setItem('refreshToken', 'demo-preview-token');
+                localStorage.setItem('user', JSON.stringify(profile));
+                window.location.href = profile.role === 'CLIENT' ? '/portal' : '/dashboard';
+              }}
+              className="w-full py-2.5 px-4 bg-slate-100 dark:bg-[#18181B] text-slate-700 dark:text-[#A1A1AA] hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-[#27272A] rounded-xl font-medium transition-all text-xs flex items-center justify-center gap-1.5"
+            >
+              ⚡ Instant Demo Enter (Bypass Server Wakeup)
             </button>
           </form>
 
